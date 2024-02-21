@@ -28,7 +28,3 @@ class Generator(nn.Module):
 
     def forward(self, z):
         return self.gen(z)
-
-
-if __name__ == '__main__':
-    print(torch.__version__)
