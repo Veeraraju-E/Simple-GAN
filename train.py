@@ -17,10 +17,10 @@ LR = 5e-4
 LATENT_DIM = 64
 IMAGE_DIM = 784
 BATCH_SIZE = 32
-EPOCHS = 75
+EPOCHS = 100
 
-discriminator = Discriminator(784)
-generator = Generator(64, 784)
+discriminator = Discriminator(IMAGE_DIM)
+generator = Generator(latent_dim=LATENT_DIM, output_dim=IMAGE_DIM)
 transformation = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,),(0.5,))])
 
 train_dataset = datasets.MNIST(root='datasets/', train=True, transform=transformation, download=True)
@@ -44,21 +44,22 @@ def train(loader):
             # the comparison would be between the encodings of the generator and the discriminator
 
             # x has samples belonging to a particular batch
-            # print(x.shape)
+            # print(x.shape) --> [32, 784]
             real_img = discriminator(x).view(-1)  # real_img is the D(x)
-            # print(real_img.shape)
-            noise = torch.randn(BATCH_SIZE, LATENT_DIM).to(DEVICE)  # x.shape[0] = BATCH_SIZE
-            fake_img_gen = generator(noise)
-            fake_img = discriminator(fake_img_gen).view(-1)  # fake_img is the G(z), we need to map it to D(G(z))
+            # print(real_img.shape) --> [32]
+            noise = torch.randn(BATCH_SIZE, LATENT_DIM).to(DEVICE)
+            fake_img_gen = generator(noise)  # fake_img_gen.shape --> [32, 784]
+            # print(fake_img_gen.shape)
+            fake_img = discriminator(fake_img_gen).view(-1)  # fake_img_gen is the G(z), fake_img is the D(G(z))
 
             # loss_disc_real = torch.log(real_img) --> for one sample, for all samples, we need
-            # expectation over all x ~ p_data(x) --> we can use BCELoss here, between D(x) and
+            # expectation overall x ~ p_data(x) --> we can use BCELoss here, between D(x) and
 
             # loss_disc_fake = 1 - torch.log(fake_img) --> for one sample, for all samples, we need
             # expectation over all z ~ p_z(z)
 
             # total loss for discriminator -> log(D(x)) + log(1 - D(G(z))) to be **maximized** wrt params of disc
-            # above would be same as minimizing the BCELoss between torch.ones_like(D(x)) and D(x) itself, so that
+            # first part would be the same as minimizing the BCELoss between torch.ones_like(D(x)) and D(x) itself, so that
             # the 2nd term in the BCELoss would become 0, and we get the log(D(x))
             # Similar explanation for the 2nd part of loss
             loss_disc_total = (loss_fn(real_img, torch.ones_like(real_img)) + loss_fn(fake_img, torch.zeros_like(fake_img)))/2
@@ -73,18 +74,17 @@ def train(loader):
             # therefore better to maximize log(D(G(z))
             output = discriminator(fake_img_gen).view(-1)
             loss_gen_total = loss_fn(output, torch.ones_like(fake_img))
+
             optim_gen.zero_grad()
             loss_gen_total.backward()
-
             optim_gen.step()
 
-            if batch_idx == 0:
+            if batch_idx == 31:
                 print(f'{epoch}/{EPOCHS} loss disc = {loss_disc_total:.4f} loss gen = {loss_gen_total:.4f}')
 
                 with torch.no_grad():
-                    fake = generator(noise).reshape(-1, 1, 28, 28)  # expand it back now for tensorboard
-                    # print(x.shape)
-                    save_image(fake, f'generated_{epoch}_{batch_idx}.png')
+                    final_generated_img = generator(noise).reshape(-1, 1, 28, 28)
+                    save_image(final_generated_img, f'generated_{epoch}_{batch_idx}.png')
 
 
 if __name__ == '__main__':
